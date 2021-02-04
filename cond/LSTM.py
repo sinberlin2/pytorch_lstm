@@ -10,17 +10,17 @@ import utils
 import train_pytorch_lstm
 import test_pytorch_lstm
 from data_loader_river_data import DataLoader
-import pytorch_model
+import pytorch_model_cond
 import pytorch_model_init_ev_batch
 #import pytorch_model_cond
 
 #Define default model parameters
 model_type= 'LSTM'
-stateful=0
-init_batch=1
+stateful=1
+init_batch=0
 hidden_layer_size=30
 num_layers= 2
-output_size= 1 #keep this 1
+output_size= 1 #keep this 1, is the prediction size (1 day at a time is predicted)
 epochs = 10
 loss_metric = 'RMSE'
 lr=0.0002
@@ -29,7 +29,6 @@ fut_pred=1 # how many predictions are made into the future
 batch_size=64
 sliding_window=10
 dropout=1.0 #keep probability
-predict_size=1
 load_model = False
 
 base_path= 'C:/Users/doyle/Documents/Coding/HAL24K/'
@@ -43,15 +42,14 @@ input_size = 1 # no of features
 pred_var = 'stage'
 all_vars = ['stage', 'flow', 'rain'] #add weekday
 stage = False
-flow=False
-rain=False
+flow = False
+rain = False
 #add selected variables to dictionary
 cond_vars_dict = dict(((k, eval(k)) for k in all_vars))
 
 cond_vars_selected = {k: v for k, v in cond_vars_dict.items() if v is not False}
 no_cond_vars=(sum(value == True for value in cond_vars_dict.values()))
 assert no_cond_vars == input_size-1, "select the correct no of variables"
-#print(cond_vars_dict)
 
 #set folder name for storing results
 
@@ -77,7 +75,8 @@ results_folder=base_path +results_folder
 
 
 def main():
-    data_loader= DataLoader(pred_var, sliding_window, predict_size, input_size, base_path, data_folder, sub_folder, cond_vars_dict)
+    print('cond lastm ')
+    data_loader= DataLoader(pred_var, sliding_window, output_size, input_size, base_path, data_folder, sub_folder, cond_vars_dict)
     dataset=data_loader.load_data()
     train_inout_seq, val_inout_seq, test_inout_seq  = data_loader.split_scale_transform(dataset)
 
@@ -92,36 +91,32 @@ def main():
                                                      num_layers=num_layers, output_size=output_size,
                                                      dropout=dropout)
         else:
-            model = pytorch_model.LSTM(batch_size=batch_size, input_size=input_size, seq_len=sliding_window,  #cond
+            model = pytorch_model_cond.LSTM(batch_size=batch_size, input_size=input_size, seq_len=sliding_window,  #cond
                                        hidden_layer_size=hidden_layer_size,
                                        num_layers=num_layers, output_size=output_size,
                                        dropout=dropout)
-
-        model_path =  results_folder + 'LSTM_' + 'tw_' + str(sliding_window) + '.pt'
-        model.load_state_dict(torch.load(model_path))
+        save_model = False
+        if save_model is not False:
+            model_path =  results_folder + 'LSTM_' + 'tw_' + str(sliding_window) + '.pt'
+            model.load_state_dict(torch.load(model_path))
 
     #Evaluation of the model/ Testing
-    yhat, naive_preds, u2_values =test_pytorch_lstm.test_model(model, test_inout_seq, fut_pred, sliding_window, stateful, init_batch)
+    yhat, u2_values, test_x =test_pytorch_lstm.test_model(model, test_inout_seq, fut_pred, sliding_window, stateful, init_batch)
 
     #Scale back data, inverse scaler expects array of shape  [samples, timesteps, features]
-    test_x=  np.asarray([item[0].tolist() for item in test_inout_seq])
-    test_y= np.asarray([item[1].tolist() for item in test_inout_seq])
-
-    if input_size ==1:
-        yhat= np.expand_dims(yhat, axis=2)
-        naive_preds = np.expand_dims(naive_preds, axis=2)
-        test_y = np.expand_dims(test_y, axis=2)
-        test_x = np.expand_dims(test_x, axis=2)
+    # test_x=  np.asarray([item[0][:,:,0].tolist() for item in test_inout_seq])
+    test_y= np.asarray([item[1][:,:,0].tolist() for item in test_inout_seq])
 
     test_x = data_loader.scale_back(test_x)
     test_preds = data_loader.scale_back(yhat)
-    naive_preds= data_loader.scale_back(naive_preds)
     test_y = data_loader.scale_back(test_y)
 
+
+    #plot all predictions of first index
     utils.plot_test_predictions(dataset, sliding_window, results_folder, u2_values[0], test_preds, pred_var, fut_pred, pred_index=0, show_last=False)
     # #plot last 50 predictions of first and last index
-    utils.plot_test_predictions(dataset, sliding_window, results_folder, u2_values[0], test_preds, pred_var, fut_pred, pred_index=0, show_last=10)
-    utils.plot_test_predictions(dataset, sliding_window, results_folder, u2_values[0], test_preds, pred_var, fut_pred, pred_index=-1, show_last=20)
+    utils.plot_test_predictions(dataset, sliding_window, results_folder, u2_values[0], test_preds, pred_var, fut_pred, pred_index= 0, show_last=10)
+    utils.plot_test_predictions(dataset, sliding_window, results_folder, u2_values[0], test_preds, pred_var, fut_pred, pred_index= -1, show_last=20)
 
     #for some random test data, plot all of its predictions
     for pred_no in [0, 30, 50,144 ]:  # last number has to be < len(lest_inout_seq)-fut_pred

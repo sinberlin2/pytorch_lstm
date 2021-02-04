@@ -28,18 +28,18 @@ class LSTM(nn.Module):
 
         #if no hidden state is provided, we use the hidden state saved by the model
         if states is None:
-            self.hidden_cell = self.hidden_cell  #this means the hidden state is automatically updated while the model being trained (and passed on).
-            #print(self.hidden_cell)
+            self.hidden_cell = self.hidden_cell #this means the hidden state is automatically updated while the model being trained (and passed on).
 
         #otherwise we use the provided hidden state
         else:
             self.hidden_cell=states
+            print(self.hidden_cell[0].shape, 'hiddenstate shape')
 
         if print_hidden == True:
             print('in hiidden: ', torch.norm(self.hidden_cell[0]).item())
 
 
-        #input has shape [batch_size, seq_len]
+        #input has shape [batch_size, seq_len, features]
 
         #With batch_first= True in model definition,  uses second dim as seq_len dimension
         # ! When I used this with batch-first =True, last hidden state and input state were not the same.
@@ -51,22 +51,15 @@ class LSTM(nn.Module):
         # without batch first, uses first dim as seq_len dimension
         #create seq of shape [seq_len, batch_size, input_size], so we have to transpose now
         input_seq_b2 = input.transpose(0, 1)
-        if input.ndim < 2:
+        if input.ndim <2:
             lstm_in_b2 = input_seq_b2.unsqueeze(2)
         else:
-            lstm_in_b2 = input_seq_b2
+            lstm_in_b2 =input_seq_b2
 
         if stateful_batches==True:
-            # for seq_no in range(self.batch_size):
-            #
-            #     lstm_out, self.hidden_cell = self.lstm(lstm_in_b2[seq_no], self.hidden_cell)
-            #
-            # inear_in = lstm_out
-           # linear_layers_results = []
-            #self.hidden_cell[0].detach_()  # we dont have to detach cell state?
-
-            #select the last states as input. Currently we are only inputting one state each, so could also be the first one.
-
+            #hidden state and cell state have shape (num_layers, batchsize,  hidden_layer_size
+            #select the last entry of both of the states.
+            #We could also just initialise the hidden state for a batch size of 1
             (h,c)=self.hidden_cell
             h = self.hidden_cell[0][:self.num_layers, -1, :self.hidden_layer_size]
             h = h.reshape(h.size(0), 1, h.size(1))
@@ -76,38 +69,35 @@ class LSTM(nn.Module):
             lstm_out_per_seq=[]
             hidden_states=[]
             cell_states=[]
-            for i, input_tw in enumerate(input):  #goes through the batches.
-                lstm_in_it = input_tw.unsqueeze(1)  #adds a 1 at the end.
-                lstm_in_it = lstm_in_it.unsqueeze(1)
+            # goes through each of the sequences in the batch
+            for i, input_tw in enumerate(input):
+                #transform input shape to  [seq_len, batch_size=1, input_size]
+                lstm_in_it = input_tw.unsqueeze(1)  #adds a dimension for the batch size
                 lstm_out, (h,c) = self.lstm(lstm_in_it, (h, c))  # updated hidden state is passed on to the next sequence in the batch.
                 lstm_out_per_seq.append(lstm_out)
                 hidden_states.append(h)
                 cell_states.append(c)
 
+            #record all the last hidden states from all the sequences in batch so
+            h_batch=torch.cat(hidden_states,dim=1)
+            c_batch=torch.cat(cell_states, dim=1 )
+            self.hidden_cell=(h_batch, c_batch)  #the final hidden cell has shape  (num_layers, 1, num_hidden)
+            print(h_batch.shape, 'hiddenstate')
 
-
-            #record all the last hidden states from all the sequences in batch so [
-            h_batch=torch.cat(hidden_states,1)
-            c_batch=torch.cat(cell_states,1 )
-            self.hidden_cell=(h_batch, c_batch)  #the final hidden cell has shape  (num_layers, 1, num_hidden), instead of batch size- should I also concatenate? how does th batch size in the hidden state affect backprop
-
-            #here all the hidden states from along the sequences are saved - so 14 (tw)x hidden states per sequence
+            #here all the hidden states from along the sequences are saved - so train_window * hidden states per sequence
             lstm_out_batch = torch.cat(lstm_out_per_seq, 1)
             linear_in = lstm_out_batch[-1]
 
 
         else:
-            #lstm_out,(last_hidden_state, last_cell_state)= self.lstm(lstm_in_b2, states)
+            #print(lstm_in_b2.shape, 'lstminshape')  #[seq_len, batch_size, input_size]
             lstm_out,self.hidden_cell= self.lstm(lstm_in_b2, self.hidden_cell)  # lstmout has shape [seq_len, batch_size, input_size]
             linear_in = lstm_out[-1]  # [batch_size, input_dim (1)]
 
         if print_hidden == True:
             print('out hiidden: ', torch.norm(self.hidden_cell[0]).item())
 
-
-
         # lstm_output has shape [batch_size, seq_len, hidden_size]
-
 
         # Push the output of last step through linear layer; returns (batch_size, 1)
         # linear_in should be [batch_size, input_size]

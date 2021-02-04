@@ -9,7 +9,7 @@ import torch
 def read_river_data( data_folder, file_name):
     dataset = pd.read_csv(data_folder + file_name + '.csv', header=0, low_memory=False,
                              infer_datetime_format=True, parse_dates={'datetime': [0]}, index_col=['datetime'], usecols=[0,2])
-    dataset = dataset[(dataset.index >= '2012-12-19')  & (dataset.index <= '2017-11-28') ]  #rain data only until end 2017
+    #dataset = dataset[(dataset.index >= '2012-12-19')  & (dataset.index <= '2017-11-28') ]  #rain data only until end 2017
     return dataset
 
 def read_nerf_data(data_folder, file_name):
@@ -36,7 +36,7 @@ def combine_data(main_df, cond_df):
 
 
 class DataLoader(object):
-    def __init__(self, pred_var, sliding_window, predict_size, input_size, base_path, data_folder, sub_folder, cond_vars):
+    def __init__(self, pred_var, sliding_window, output_size, input_size, base_path, data_folder, sub_folder, cond_vars):
         """
         :param xs:
         :param ys:
@@ -44,7 +44,7 @@ class DataLoader(object):
         """
 
         self.tw= sliding_window
-        self.predict_size= predict_size
+        self.predict_size= output_size
         self.input_size= input_size
         self.pred_var= pred_var
         self.sliding_window=sliding_window
@@ -59,6 +59,7 @@ class DataLoader(object):
             self.stage_data = 'river-trent-stone-rural-darlaston'
 
         self.cond_vars = {k: v for k, v in cond_vars.items() if v is not False}
+        print('Conditional variables used:')
         print(self.cond_vars)
 
         #Specify which variables should have a scaler (apart from prediction variable which has a scaler)
@@ -90,7 +91,6 @@ class DataLoader(object):
                 print('Enter valid prediction variable')
 
             if 'stage' in self.cond_vars.keys():
-                print('stage is true')
                 add_data= read_river_data(self.data_folder, self.stage_data)
                 dataset=combine_data(dataset, add_data)
             if 'flow' in self.cond_vars.keys():
@@ -124,7 +124,6 @@ class DataLoader(object):
 
         dataset = pd.DataFrame(dataset)
         dataset = dataset.astype('float64')
-        print(dataset)
         return dataset
 
     def split_data(self, dataset):
@@ -140,8 +139,6 @@ class DataLoader(object):
 
     def scale_data(self, data):
         #print(data.shape, 'inout shape') #expects S, F  # should expect B,S,F
-
-        print(data.shape, 'datashape')
         scaler_no=0
         for i in range(data.shape[2]):
             if i in self.scaler_index.values():
@@ -163,14 +160,11 @@ class DataLoader(object):
         L = len(input_data)
         x = []
         y = []
-        #print(input_data)
-        print(input_data.shape)
         for i in range(L - tw):
             train_seq = input_data[i:i + tw]
-            # if i ==0:
-            #     print(train_seq)
             train_label = input_data[
                           i + tw:i + tw + predict_size]
+
             # # for conditional model only keep the target variable values
             # if input_data.ndim >1:
             #     train_label = train_label[:,:, 0]
@@ -211,7 +205,7 @@ class DataLoader(object):
         val_data_normalized = self.scale_data(val_data)
         test_data_normalized = self.scale_data(test_data)
 
-        print(train_data_normalized.shape , 'traindatanorm')
+        #print(train_data_normalized.shape , 'traindatanorm')
         if self.sliding_window is not False: # reshape into X=t->t+tw and Y=t+tw+predict_size
 
             print('sliding window method used', self.tw)

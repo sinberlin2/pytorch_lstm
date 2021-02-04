@@ -13,11 +13,13 @@ def test_model(model, test_inout_seq, fut_pred, tw, stateful, init_batch):
     len_preds=len(test_inout_seq)-fut_pred+1
     test_predictions_all=np.empty(shape=(len_preds,fut_pred))
     naive_predictions_all= np.empty(shape=(len_preds ,fut_pred))
-    labels1=  np.empty(shape=(len_preds,fut_pred))
-    for pred_day in range(fut_pred):
-        labels1[:,pred_day] = [item[1][:,:,0] for item in test_inout_seq][pred_day: len_preds+pred_day]
+    test_y=  np.empty(shape=(len_preds,fut_pred))  #maybe add the input_size here too
+    test_x= np.empty(shape=(len_preds,tw, 1))  # features are fixed to the prediction var # could also change features to input_size
 
-    #print(labels1)
+    for pred_day in range(fut_pred):
+        test_y[:,pred_day] = [item[1][:,:,0] for item in test_inout_seq][pred_day: len_preds+pred_day]
+        #test_x[ pred_day, :, :] = [item[0][:,0,:] for item in test_inout_seq][pred_day]   #wit input_size as last dim
+        test_x[ pred_day, :, 0] = [item[0][:,0,0] for item in test_inout_seq][pred_day]
 
     # notify all our layers that we are in eval mode, that way, batchnorm or dropout layers will work in eval mode instead of training mode
     model.eval()
@@ -27,7 +29,7 @@ def test_model(model, test_inout_seq, fut_pred, tw, stateful, init_batch):
 
     for batch_no, (seq, labels) in enumerate(test_loader):
         seq = seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1])
-        labels = labels.reshape(labels.shape[0], labels.shape[1], labels.shape[-1])
+        labels = labels.reshape(labels.shape[0], labels.shape[-1])  #, labels.shape[-1]
 
         #initialise list for predictions for each sequence for multiple predictions ahead
         test_losses_seq=0   # naive score, last value of test input is prediction
@@ -60,7 +62,6 @@ def test_model(model, test_inout_seq, fut_pred, tw, stateful, init_batch):
                         test_prediction, (h, c) = model.forward(seq, model.hidden_cell , print_hidden= False) #, states=None if i put in states=None, it doesnt think it is none anymore   # hidden state and cell state are reset
 
                     else:
-                        print(seq.shape)
                         test_prediction, _ = model.forward(seq) #it's not necessart to pass hidden and cell state since the model is by definition always reusing the hidden state
 
 
@@ -74,20 +75,32 @@ def test_model(model, test_inout_seq, fut_pred, tw, stateful, init_batch):
                     #add the next label value to labels with multiple predictions (change maybe to use labels1)
                     if i > 0 :
                         add_to_label = torch.DoubleTensor(test_inout_seq[batch_no+ i][1])
-                        labels = torch.cat((labels.squeeze(0), add_to_label.squeeze(0))).unsqueeze(0)
+                        labels = torch.cat((labels, add_to_label.squeeze(0)))#.unsqueeze(0)
+                        print(labels.shape, add_to_label.shape, 'add to label ')
 
+
+                        #labels = torch.cat((labels.squeeze(0), add_to_label.squeeze(0))).unsqueeze(0)
+
+                    print(labels.shape, 'label')
                     #calculate loss
-                    test_loss= utils.loss_function(test_prediction, labels[:,i]).item()
+                    test_prediction= test_prediction#.squeeze(1)
+                    label= labels[i,:]#.squeeze(1)
+                    #print(test_prediction.shape label.shape)
+
+                    test_loss= utils.loss_function(test_prediction,label).item()
                     test_losses_seq+=test_loss  #or save as list to then extract first and last values
 
                     #calculate naive loss
-                    naive_loss= utils.loss_function(naive_truth, labels[:,i]).item()
+                    naive_loss= utils.loss_function(naive_truth, labels[i,:]).item()
                     naive_losses_seq+=naive_loss
 
 
     #average loss for each prediction time steps
     test_loss_all = np.mean(test_predictions_all, axis=0)
     naive_loss_all = np.mean(naive_predictions_all, axis=0)
+
+    print("test_loss_all_pred_days:",  test_loss_all)
+    print("naive_loss_all_pred_days:",  naive_loss_all)
 
     #avergage loss for all prediciton time steps
     test_loss_avg = np.mean(test_loss_all, axis=0)
@@ -98,12 +111,18 @@ def test_model(model, test_inout_seq, fut_pred, tw, stateful, init_batch):
 
     #calcuate U2 values for each prediction.
     # U2 value should get better with every prediciton time step as the naive prediciton becomes increasingly inaccurate
+
+    print(test_predictions_all[:,0][:5])
+    print(test_y[:,0][:5])
+
     u2_values=[]
     for pred_day in range(fut_pred):
-        u2_values.append(utils.get_u2_value(test_predictions_all[:,pred_day], labels1[:,pred_day], naive_predictions_all[:,pred_day]))
+        u2_values.append(utils.get_u2_value(test_predictions_all[:,pred_day], test_y[:,pred_day], naive_predictions_all[:,pred_day]))
 
     print(u2_values)
     print("u2_value_first: %f" % u2_values[0])
 
+    test_predictions_all=np.expand_dims(test_predictions_all, axis=2)
+    #naive_predictions_all=np.expand_dims(naive_predictions_all, axis=2)
 
-    return(test_predictions_all,  naive_predictions_all, u2_values)
+    return test_predictions_all, u2_values, test_x

@@ -28,8 +28,7 @@ class LSTM(nn.Module):
 
         #if no hidden state is provided, we use the hidden state saved by the model
         if states is None:
-            self.hidden_cell = self.hidden_cell  #this means the hidden state is automatically updated while the model being trained (and passed on).
-            #print(self.hidden_cell)
+            self.hidden_cell = self.hidden_cell #this means the hidden state is automatically updated while the model being trained (and passed on).
 
         #otherwise we use the provided hidden state
         else:
@@ -39,7 +38,7 @@ class LSTM(nn.Module):
             print('in hiidden: ', torch.norm(self.hidden_cell[0]).item())
 
 
-        #input has shape [batch_size, seq_len]
+        #input has shape [batch_size, seq_len, features]
 
         #With batch_first= True in model definition,  uses second dim as seq_len dimension
         # ! When I used this with batch-first =True, last hidden state and input state were not the same.
@@ -51,10 +50,10 @@ class LSTM(nn.Module):
         # without batch first, uses first dim as seq_len dimension
         #create seq of shape [seq_len, batch_size, input_size], so we have to transpose now
         input_seq_b2 = input.transpose(0, 1)
-        if input.ndim < 2:
+        if input.ndim <2:
             lstm_in_b2 = input_seq_b2.unsqueeze(2)
         else:
-            lstm_in_b2 = input_seq_b2
+            lstm_in_b2 =input_seq_b2
 
         if stateful_batches==True:
             # for seq_no in range(self.batch_size):
@@ -85,7 +84,6 @@ class LSTM(nn.Module):
                 cell_states.append(c)
 
 
-
             #record all the last hidden states from all the sequences in batch so [
             h_batch=torch.cat(hidden_states,1)
             c_batch=torch.cat(cell_states,1 )
@@ -104,10 +102,7 @@ class LSTM(nn.Module):
         if print_hidden == True:
             print('out hiidden: ', torch.norm(self.hidden_cell[0]).item())
 
-
-
         # lstm_output has shape [batch_size, seq_len, hidden_size]
-
 
         # Push the output of last step through linear layer; returns (batch_size, 1)
         # linear_in should be [batch_size, input_size]

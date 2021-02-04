@@ -51,10 +51,7 @@ class LSTM(nn.Module):
         # without batch first, uses first dim as seq_len dimension
         #create seq of shape [seq_len, batch_size, input_size], so we have to transpose now
         input_seq_b2 = input.transpose(0, 1)
-        if input.ndim < 2:
-            lstm_in_b2 = input_seq_b2.unsqueeze(2)
-        else:
-            lstm_in_b2 = input_seq_b2
+        lstm_in_b2 = input_seq_b2.unsqueeze(2)
 
         if stateful_batches==True:
             # for seq_no in range(self.batch_size):

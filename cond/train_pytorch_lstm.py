@@ -3,7 +3,7 @@ import torch
 import utils
 #import pytorch_model
 import pytorch_model_init_ev_batch
-import pytorch_model
+import pytorch_model_cond
 
 
 
@@ -18,11 +18,11 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
                                    num_layers=num_layers, output_size=output_size,
                                    dropout=dropout)
     else:
-        model = pytorch_model.LSTM(batch_size=batch_size, input_size=input_size, seq_len=train_window, hidden_layer_size=hidden_layer_size,
+        model = pytorch_model_cond.LSTM(batch_size=batch_size, input_size=input_size, seq_len=train_window, hidden_layer_size=hidden_layer_size,
                   num_layers=num_layers, output_size=output_size, dropout=dropout)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=lr_decay)
-    print(model)
+    #print(model)
     model=model.double()
     if stateful==1:
         print('Epochs are initialised with zeors, batches are stateful. The hidden state is passed on between the sequences of the batch.')
@@ -42,34 +42,34 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
         epoch_val_loss=0
 
         # # we initialise hidden state every epoch, to not make the results of the model depend on the previous training results
-        model.hidden_cell = (torch.zeros(model.num_layers, model.batch_size, model.hidden_layer_size),   #(num_layers * num_directions, batch, hidden_size):
-                             torch.zeros(model.num_layers, model.batch_size,  model.hidden_layer_size))   # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
+        model.hidden_cell = (torch.zeros((model.num_layers, model.batch_size, model.hidden_layer_size), dtype=torch.float64),   #(num_layers * num_directions, batch, hidden_size):
+                             torch.zeros((model.num_layers, model.batch_size,  model.hidden_layer_size),dtype = torch.float64))  # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
 
         # hidden = model.init_hidden(args.batch_size) also an option
         model.train()
 
         for step, (seq, labels) in enumerate(train_loader):
-            seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1])
-            labels=labels.reshape(labels.shape[0], labels.shape[1], labels.shape[-1])
+            seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1])  #seq has shape [B, TW, Features]
+            labels=labels.reshape(labels.shape[0], labels.shape[-1]) #labels has shape  [B, Labels], so [B, timesteps]  # labels.shape[1]  , maybe should add features
 
-            #seq has shape  [B, timesteps], so  [64, 14]
-            #labels has shape  [B, Labels], so [64,1]
-
-            # zero the gradients  # Step 1. Remember that Pytorch accumulates gradients # We need to clear them out before each instance
-            optimizer.zero_grad()  #clears old gradients
+            # zero the gradients  # Step 1. Remember that Pytorch accumulates gradients # We need to clear gradients before each instance
+            optimizer.zero_grad()
 
             # forward pass through the model
             #if the model initialises the hidden state at each batch, we should not input the previous hidden state
             if init_batch==1:
                 y_pred, model.hidden_cell = model.forward(seq)
+
             else:
                 # Starting each batch, we detach the hidden state from how it was previously produced.
                 # Tthis means that we dont propagate back till the beginning of the input data,
                 # but consider the input hidden cell from the last batch as constant
                 # Otherwise the model would  backpropagate all the way to start of the dataset.
-                y_pred, model.hidden_cell = model.forward(seq, (model.hidden_cell[0].detach().double(), model.hidden_cell[1].detach().double()), print_hidden=False, stateful_batches=stateful)  #states=None if i put in states=None, it doesnt think it is none anymore  #underscore is for hidden and cell state which we ignore during training.
+                #y_pred, model.hidden_cell = model.forward(seq, (model.hidden_cell[0].detach().float64(), model.hidden_cell[1].detach().float64()), print_hidden=False, stateful_batches=stateful)  #states=None if i put in states=None, it doesnt think it is none anymore  #underscore is for hidden and cell state which we ignore during training.
+                y_pred, model.hidden_cell = model.forward(seq, (model.hidden_cell[0].detach(), model.hidden_cell[1].detach()), print_hidden=False, stateful_batches=stateful)  #states=None if i put in states=None, it doesnt think it is none anymore  #underscore is for hidden and cell state which we ignore during training.
 
             #compute loss
+            #labels = labels.squeeze(1)  # or change model output to correct shape
             single_loss =  utils.loss_function(y_pred, labels)
 
             #check gradients
@@ -94,7 +94,7 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
 
         for val_batch_no, (seq, labels) in enumerate(val_loader):
             seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1])
-            labels=labels.reshape(labels.shape[0], labels.shape[1], labels.shape[-1])
+            labels=labels.reshape(labels.shape[0], labels.shape[-1])  #labels.shape[1]
             # we dont have to input the detached hiddens state, cause there is no backprop
             with torch.no_grad():
                 # forward pass through the model
@@ -102,6 +102,8 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
                     y_pred, _ = model.forward(seq)
                 else:
                     y_pred, _ = model.forward(seq, stateful_batches=stateful)  # underscore is for hidden and cell state which we ignore during training.
+
+                #labels = labels.squeeze(1) #or change model output to correct shape
                 single_loss = utils.loss_function(y_pred, labels).item()
                 epoch_val_loss += single_loss
 
