@@ -33,7 +33,6 @@ class LSTM(nn.Module):
         #otherwise we use the provided hidden state
         else:
             self.hidden_cell=states
-            print(self.hidden_cell[0].shape, 'hiddenstate shape')
 
         if print_hidden == True:
             print('in hiidden: ', torch.norm(self.hidden_cell[0]).item())
@@ -82,7 +81,7 @@ class LSTM(nn.Module):
             h_batch=torch.cat(hidden_states,dim=1)
             c_batch=torch.cat(cell_states, dim=1 )
             self.hidden_cell=(h_batch, c_batch)  #the final hidden cell has shape  (num_layers, 1, num_hidden)
-            print(h_batch.shape, 'hiddenstate')
+            #print(h_batch.shape, 'hiddenstate')
 
             #here all the hidden states from along the sequences are saved - so train_window * hidden states per sequence
             lstm_out_batch = torch.cat(lstm_out_per_seq, 1)

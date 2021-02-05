@@ -21,7 +21,7 @@ init_batch=1
 hidden_layer_size=30
 num_layers= 2
 output_size= 1 #keep this 1
-epochs = 10
+epochs = 20
 loss_metric = 'RMSE'
 lr=0.0002
 lr_decay=0.0
@@ -38,13 +38,13 @@ data_folder= base_path + 'data/river_trent/' + sub_folder +'/'
 
 
 ### Define Model Inputs ###
-input_size = 1 # no of features
+input_size = 2 # no of features
 # Define Prediction variable
 pred_var = 'stage'
 all_vars = ['stage', 'flow', 'rain'] #add weekday
 stage = False
 flow=False
-rain=False
+rain=True
 #add selected variables to dictionary
 cond_vars_dict = dict(((k, eval(k)) for k in all_vars))
 

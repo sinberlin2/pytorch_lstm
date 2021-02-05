@@ -52,11 +52,14 @@ def get_u2_value(y_pred, y_true, y_prev):  #x is y_pred
 
 
 #could add option to only plot the last values
-def plot_test_predictions(dataset, tw, results_folder, u2_value,  test_preds, pred_var, fut_pred, pred_index=0, show_last= 50):
+def plot_test_predictions(dataset, test_y, tw, results_folder, u2_value,  test_preds, pred_var, fut_pred, pred_index=0, show_last= 50):
 
     #get the relevant test data (first prediction day etc). By default this is the first prediction day
-    test_preds_ind = [item[pred_index] for item in test_preds]
-    test_preds_ind = np.squeeze(test_preds_ind)
+    # test_preds_sel = [item[pred_index] for item in test_preds]
+    # test_preds_sel = np.squeeze(test_preds_sel)
+    #there is no delay between labels and predictions
+    test_preds_sel=test_preds[:,pred_index, 0]
+    test_y_sel=test_y[:,pred_index, 0]
 
     # plot the last test  data
     #get the start of the test data including the first train window
@@ -64,9 +67,12 @@ def plot_test_predictions(dataset, tw, results_folder, u2_value,  test_preds, pr
 
     if show_last is not False:
         test_x_len = show_last
-        test_preds_ind = test_preds_ind[-show_last:]
+        test_preds_sel = test_preds_sel[-show_last:]
+        test_y_sel = test_y_sel[-show_last:]
 
     test_data = dataset[-test_x_len:]
+    test_data= test_data. iloc[:, 0]
+    test_data = test_y_sel
     #plot test  data
     x = np.arange(0, test_x_len, 1)
     plt.plot(x, test_data, label='test data')
@@ -74,14 +80,10 @@ def plot_test_predictions(dataset, tw, results_folder, u2_value,  test_preds, pr
 
     # #plot predictions
     #get the delay for plotting the predictions
-    if pred_index < 0:
-        pred_delay = fut_pred  + pred_index +1  #maybe adjust this with multiple predictions
-    else:
-        pred_delay =  pred_index +1
-
-    x = np.arange(pred_delay , pred_delay + test_preds_ind.shape[0], 1)
+    # pred_delay= fut_pred +pred_index -1
+    # x = np.arange(pred_delay , pred_delay + test_preds_sel.shape[0], 1)
     #print(x)
-    plt.plot(x, test_preds_ind, label='predictions')
+    plt.plot(x, test_preds_sel, label='predictions')
 
     #crate plot
     plt.suptitle('LSTM Predictions of ' +pred_var + ' for day ' + str(pred_index), fontsize=12)
@@ -91,7 +93,7 @@ def plot_test_predictions(dataset, tw, results_folder, u2_value,  test_preds, pr
     plt.grid(False)
     plt.autoscale(axis='x', tight=True)
     plt.legend(loc='upper left', frameon=False)
-    fig_path = results_folder + 'Test_predictions' + str(pred_index) + '_ft_' + str(fut_pred)
+    fig_path = results_folder + 'preds_day_' + str(pred_index) + '_ft_' + str(fut_pred) + "_last_" + str(show_last)
     plt.savefig(fig_path)
     #plt.show()
     plt.close('all')
@@ -100,7 +102,7 @@ def plot_test_predictions(dataset, tw, results_folder, u2_value,  test_preds, pr
 
 def plot_sample_prediction(test_x, test_y, test_preds, pred_no, tw, fut_pred, output_size, results_folder, pred_var):
     # original test data
-    test_input = test_x[pred_no]
+    test_input = test_x[pred_no,:,0]
     test_actual_data = test_y[pred_no: pred_no + fut_pred *output_size].flatten()   #maybe get rid of times outputsize
     test_pred = test_preds[pred_no]
 

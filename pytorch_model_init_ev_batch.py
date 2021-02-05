@@ -27,8 +27,8 @@ class LSTM(nn.Module):
     def forward(self, input, states=None, print_hidden=False):
 
         if states is None:
-            self.hidden_cell = (torch.zeros((self.num_layers, input.size(0), self.hidden_layer_size), dtype = torch.float64),   #(num_layers * num_directions, batch, hidden_size):
-                         torch.zeros((self.num_layers, input.size(0),  self.hidden_layer_size), dtype=torch.float64))# (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
+            self.hidden_cell = (torch.zeros((self.num_layers, input.size(0), self.hidden_layer_size), dtype = torch.double),   #(num_layers * num_directions, batch, hidden_size):
+                         torch.zeros((self.num_layers, input.size(0),  self.hidden_layer_size), dtype=torch.double))# (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
 
         else:
             self.hidden_cell=states

@@ -98,6 +98,9 @@ def test_model(model, test_inout_seq, fut_pred, tw, stateful, init_batch):
 
     #calcuate U2 values for each prediction.
     # U2 value should get better with every prediciton time step as the naive prediciton becomes increasingly inaccurate
+
+    print(test_predictions_all[:5])
+    print(labels1[:5])
     u2_values=[]
     for pred_day in range(fut_pred):
         u2_values.append(utils.get_u2_value(test_predictions_all[:,pred_day], labels1[:,pred_day], naive_predictions_all[:,pred_day]))

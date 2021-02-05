@@ -4,6 +4,7 @@ import utils
 #import pytorch_model
 import pytorch_model_init_ev_batch
 import pytorch_model_cond
+from torch.autograd import Variable
 
 
 
@@ -22,7 +23,7 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
                   num_layers=num_layers, output_size=output_size, dropout=dropout)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=lr_decay)
-    #print(model)
+    print(model)
     model=model.double()
     if stateful==1:
         print('Epochs are initialised with zeors, batches are stateful. The hidden state is passed on between the sequences of the batch.')
@@ -42,16 +43,21 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
         epoch_val_loss=0
 
         # # we initialise hidden state every epoch, to not make the results of the model depend on the previous training results
-        model.hidden_cell = (torch.zeros((model.num_layers, model.batch_size, model.hidden_layer_size), dtype=torch.float64),   #(num_layers * num_directions, batch, hidden_size):
-                             torch.zeros((model.num_layers, model.batch_size,  model.hidden_layer_size),dtype = torch.float64))  # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
+        # model.hidden_cell = (torch.zeros((model.num_layers, model.batch_size, model.hidden_layer_size), dtype=torch.float64),   #(num_layers * num_directions, batch, hidden_size):
+        #                      torch.zeros((model.num_layers, model.batch_size,  model.hidden_layer_size),dtype = torch.float64))  # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
+        # model.hidden_cell = (
+        #     Variable(torch.zeros(model.num_layers, model.batch_size, model.hidden_layer_size)).float64(),
+        #     Variable(torch.zeros(model.num_layers, model.batch_size, model.hidden_layer_size)).float64())
+        model.hidden_cell = (Variable(torch.zeros((model.num_layers, model.batch_size, model.hidden_layer_size), dtype=torch.float64)),
+                             Variable(torch.zeros((model.num_layers, model.batch_size, model.hidden_layer_size), dtype=torch.float64)))
 
         # hidden = model.init_hidden(args.batch_size) also an option
         model.train()
 
         for step, (seq, labels) in enumerate(train_loader):
-            seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1])  #seq has shape [B, TW, Features]
-            labels=labels.reshape(labels.shape[0], labels.shape[-1]) #labels has shape  [B, Labels], so [B, timesteps]  # labels.shape[1]  , maybe should add features
-
+            seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1]).double()  #seq has shape [B, TW, Features]
+            labels=labels.reshape(labels.shape[0], labels.shape[-1]).double() #labels has shape  [B, Labels], so [B, timesteps]  # labels.shape[1]  , maybe should add features  labels = labels.reshape(labels.shape[0], labels.shape[1],labels.shape[-1])  #, labels.shape[-1]
+            #labels = labels[:, ]
             # zero the gradients  # Step 1. Remember that Pytorch accumulates gradients # We need to clear gradients before each instance
             optimizer.zero_grad()
 
@@ -69,22 +75,19 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
                 y_pred, model.hidden_cell = model.forward(seq, (model.hidden_cell[0].detach(), model.hidden_cell[1].detach()), print_hidden=False, stateful_batches=stateful)  #states=None if i put in states=None, it doesnt think it is none anymore  #underscore is for hidden and cell state which we ignore during training.
 
             #compute loss
-            #labels = labels.squeeze(1)  # or change model output to correct shape
             single_loss =  utils.loss_function(y_pred, labels)
 
             #check gradients
             check_gradients = False
             if check_gradients == True:
-                grads = []
-                for param in model.parameters():
-                    grads.append(torch.norm(param).item())
-                print(grads)
+                grads = [torch.norm(param).item() for param in model.parameters()]
+                print(grads[0])
 
             # get gradients with respect to that loss, backward propagation,
             single_loss.backward()
 
-            # # # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs., was not useful for our experiments
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.25)  good clip norm value is 1.0
+            # # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs., was not useful for our experiments
+            #torch.nn.utils.clip_grad_norm(model.parameters(), 1.0) # good clip norm value is 1.0
 
             # actual optimizing step
             optimizer.step()
@@ -93,8 +96,9 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
             epoch_train_loss+=loss_current
 
         for val_batch_no, (seq, labels) in enumerate(val_loader):
-            seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1])
-            labels=labels.reshape(labels.shape[0], labels.shape[-1])  #labels.shape[1]
+            seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1]).double()
+            labels = labels.reshape(labels.shape[0], labels.shape[-1]).double()  # labels has shape  [B, Labels], so [B, timesteps]  # labels.shape[1]  , maybe should add features  labels = labels.reshape(labels.shape[0], labels.shape[1],labels.shape[-1])  #, labels.shape[-1]
+            #labels = labels[:, 0:1]
             # we dont have to input the detached hiddens state, cause there is no backprop
             with torch.no_grad():
                 # forward pass through the model

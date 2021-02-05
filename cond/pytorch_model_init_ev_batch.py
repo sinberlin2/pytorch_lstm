@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 
 
 class LSTM(nn.Module):
@@ -18,18 +19,27 @@ class LSTM(nn.Module):
                             hidden_size = self.hidden_layer_size,
                             num_layers = self.num_layers, batch_first = self.batch_first, dropout=self.dropout )  #nonlinearity is by default tanh, should be able to change to relu
 
-        self.linear = nn.Linear(in_features = self.hidden_layer_size, out_features= self.input_size, bias=True)  #or input size?
+        self.linear = nn.Linear(in_features = self.hidden_layer_size, out_features= self.input_size *self.output_size, bias=True)
 
         #define hidden cell, not necessary
         self.hidden_cell=None
+
+    # def init_hidden(self, batch_size):
+    #     hidden = Variable(next(self.parameters()).data.new(batch_size, self.cell_size), requires_grad=False)
+    #     cell = Variable(next(self.parameters()).data.new(batch_size, self.cell_size), requires_grad=False)
+    #     return (hidden.zero_(), cell.zero_())
 
 
     def forward(self, input, states=None, print_hidden=False):
 
         if states is None:
-            self.hidden_cell = (torch.zeros((self.num_layers, input.size(0), self.hidden_layer_size), dtype=torch.float64),   #(num_layers * num_directions, batch, hidden_size):
-                         torch.zeros((self.num_layers, input.size(0),  self.hidden_layer_size), dtype=torch.float64))   # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
-
+            # self.hidden_cell = (torch.zeros((self.num_layers, input.size(0), self.hidden_layer_size), dtype=torch.float64),   #(num_layers * num_directions, batch, hidden_size):
+            #              torch.zeros((self.num_layers, input.size(0),  self.hidden_layer_size), dtype=torch.float64))   # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
+            # self.hidden_cell = (Variable(torch.zeros(self.num_layers, input.size(0), self.hidden_layer_size)).float64(),   #(num_layers * num_directions, batch, hidden_size):
+            #              Variable(torch.zeros(self.num_layers, input.size(0),  self.hidden_layer_size)).float64())  # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
+            self.hidden_cell = (
+            Variable(torch.zeros((self.num_layers, input.size(0), self.hidden_layer_size), dtype=torch.float64)),
+            Variable(torch.zeros((self.num_layers, input.size(0) , self.hidden_layer_size), dtype=torch.float64)))
         else:
             self.hidden_cell=states
 
@@ -44,7 +54,6 @@ class LSTM(nn.Module):
         #change seq shape to (batch_size, seq_len, input_size) where input_size means no of features
         # len_input_seq = input_seq.shape[0] #ie batch_size
         # lstm_in= input_seq.view(len_input_seq, -1, 1)
-
 
         # without batch first, uses first dim as seq_len dimension
         #create seq of shape [seq_len, batch_size, input_size], so we have to transpose now
@@ -62,8 +71,6 @@ class LSTM(nn.Module):
         if print_hidden == True:
             print('out hiidden: ', torch.norm(self.hidden_cell[0]).item())
 
-
-
         # Push the output of last step through linear layer; returns (batch_size, 1)
         # linear_in should be [batch_size, input_size]
 
@@ -75,14 +82,14 @@ class LSTM(nn.Module):
         linear_in=lstm_out[-1]   # [batch_size, input_dim (1)]
 
         # #linear in should be equivalent to last hidden state. can use this to check it.
-        # last_hidden= last_hidden_state[-1]
-        # print(last_hidden[0], linear_in[0])
+        # last_hidden= last_hidden_state[-1]  print(last_hidden[0], linear_in[0])
 
         # ###to use all hidden states as input for the linear layer (the sequences must always have the same length)
         # linear_in=lstm_out  # [batch_size, seq_len, input_len]
 
         #Linear input shape (batch_dim, (seq_lengnth), input_length(no_features))
         linear_out = self.linear(linear_in)
+        #print(linear_out.shape)
 
         #linear_out shape is [batch_size, input_size (nofeatures)] #[64,1]
         predictions = linear_out

@@ -62,6 +62,7 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
             #if the model initialises the hidden state at each batch, we should not input the previous hidden state
             if init_batch==1:
                 y_pred, model.hidden_cell = model.forward(seq)
+
             else:
                 # Starting each batch, we detach the hidden state from how it was previously produced.
                 # Tthis means that we dont propagate back till the beginning of the input data,
@@ -73,12 +74,13 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
             single_loss =  utils.loss_function(y_pred, labels)
 
             #check gradients
-            check_gradients = False
+            check_gradients = True
+
             if check_gradients == True:
                 grads = []
                 for param in model.parameters():
                     grads.append(torch.norm(param).item())
-                print(grads)
+                print(grads[0])
 
             # get gradients with respect to that loss, backward propagation,
             single_loss.backward()
@@ -88,6 +90,7 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
 
             # actual optimizing step
             optimizer.step()
+
 
             loss_current = float(single_loss.item())
             epoch_train_loss+=loss_current
