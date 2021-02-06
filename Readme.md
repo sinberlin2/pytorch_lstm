@@ -1,6 +1,6 @@
 # Pytorch LSTM with different options of initialisation
 
-States Initialisation LSTM:
+### Initialisation of states in the LSTM:
 The hidden state and the cell state are initialised with zeros at the beginning of training, rather than a random initialisation, as the states’ values modify which values in the parts of the new inputs contribute to the new states.
  A zero-initialization therefore means that the weights do not contain any information, which makes sense as nothing has been learnt before training.
 
