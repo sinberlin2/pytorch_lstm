@@ -24,22 +24,18 @@ class LSTM(nn.Module):
         #define hidden cell, not necessary
         self.hidden_cell=None
 
-    # def init_hidden(self, batch_size):
-    #     hidden = Variable(next(self.parameters()).data.new(batch_size, self.cell_size), requires_grad=False)
-    #     cell = Variable(next(self.parameters()).data.new(batch_size, self.cell_size), requires_grad=False)
-    #     return (hidden.zero_(), cell.zero_())
+    def init_hidden(self, batch_size):
+        #hidden and cell state have shape (num_layers * num_directions, batch_size, hidden_layer_size)
+        hidden_cell = (Variable(torch.zeros((self.num_layers, batch_size, self.hidden_layer_size), dtype=torch.double)),
+            Variable(torch.zeros((self.num_layers, batch_size, self.hidden_layer_size), dtype=torch.double)))
+
+        return hidden_cell
 
 
     def forward(self, input, states=None, print_hidden=False):
 
         if states is None:
-            # self.hidden_cell = (torch.zeros((self.num_layers, input.size(0), self.hidden_layer_size), dtype=torch.float64),   #(num_layers * num_directions, batch, hidden_size):
-            #              torch.zeros((self.num_layers, input.size(0),  self.hidden_layer_size), dtype=torch.float64))   # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
-            # self.hidden_cell = (Variable(torch.zeros(self.num_layers, input.size(0), self.hidden_layer_size)).float64(),   #(num_layers * num_directions, batch, hidden_size):
-            #              Variable(torch.zeros(self.num_layers, input.size(0),  self.hidden_layer_size)).float64())  # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
-            self.hidden_cell = (
-            Variable(torch.zeros((self.num_layers, input.size(0), self.hidden_layer_size), dtype=torch.float64)),
-            Variable(torch.zeros((self.num_layers, input.size(0) , self.hidden_layer_size), dtype=torch.float64)))
+            self.hidden_cell= self.init_hidden(input.shape[0]) #not batch size, cause in test mode we want to test 1 sequence at a time
         else:
             self.hidden_cell=states
 
@@ -56,7 +52,9 @@ class LSTM(nn.Module):
         # lstm_in= input_seq.view(len_input_seq, -1, 1)
 
         # without batch first, uses first dim as seq_len dimension
-        #create seq of shape [seq_len, batch_size, input_size], so we have to transpose now
+        #input shape is [B, TW, F}
+        #create seq of shape [train_window, batch_size, features], so we have to transpose now
+
         input_seq_b2 = input.transpose(0, 1)
         if input.ndim < 2:
             lstm_in_b2 = input_seq_b2.unsqueeze(2)
@@ -89,7 +87,6 @@ class LSTM(nn.Module):
 
         #Linear input shape (batch_dim, (seq_lengnth), input_length(no_features))
         linear_out = self.linear(linear_in)
-        #print(linear_out.shape)
 
         #linear_out shape is [batch_size, input_size (nofeatures)] #[64,1]
         predictions = linear_out

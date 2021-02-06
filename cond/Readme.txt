@@ -50,3 +50,4 @@ stateful: Boolean (default False). If True, the last state for each sample at in
 
 
 
+#https://stackabuse.com/time-series-prediction-using-lstm-with-pytorch-in-python/

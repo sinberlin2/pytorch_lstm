@@ -1,12 +1,8 @@
 import os.path
 import torch
 import utils
-#import pytorch_model
 import pytorch_model_init_ev_batch
 import pytorch_model_cond
-from torch.autograd import Variable
-
-
 
 
 #TRAINING
@@ -26,9 +22,9 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
     print(model)
     model=model.double()
     if stateful==1:
-        print('Epochs are initialised with zeors, batches are stateful. The hidden state is passed on between the sequences of the batch.')
+        print('Epochs are initialised with zeros, batches are stateful. The hidden state is passed on between the sequences of the batch.')
     else:
-        print('Epochs are initialised with zeors, batches are stateless. Hidden states are only passed between batches.')
+        print('Epochs are initialised with zeros, batches are stateless. Hidden states are only passed between batches.')
 
     #for (mini) batches
     train_loader = torch.utils.data.DataLoader(train_inout_seq, batch_size= batch_size, shuffle=False, num_workers=1, drop_last=True )  #false bc we dont wanna shuffle time
@@ -43,36 +39,27 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
         epoch_val_loss=0
 
         # # we initialise hidden state every epoch, to not make the results of the model depend on the previous training results
-        # model.hidden_cell = (torch.zeros((model.num_layers, model.batch_size, model.hidden_layer_size), dtype=torch.float64),   #(num_layers * num_directions, batch, hidden_size):
-        #                      torch.zeros((model.num_layers, model.batch_size,  model.hidden_layer_size),dtype = torch.float64))  # (num_layers * num_directions, batch, hidden_size): #1, 1, model.hidden_layer_size
-        # model.hidden_cell = (
-        #     Variable(torch.zeros(model.num_layers, model.batch_size, model.hidden_layer_size)).float64(),
-        #     Variable(torch.zeros(model.num_layers, model.batch_size, model.hidden_layer_size)).float64())
-        model.hidden_cell = (Variable(torch.zeros((model.num_layers, model.batch_size, model.hidden_layer_size), dtype=torch.float64)),
-                             Variable(torch.zeros((model.num_layers, model.batch_size, model.hidden_layer_size), dtype=torch.float64)))
+        model.hidden_cell = model.init_hidden(model.batch_size)
 
-        # hidden = model.init_hidden(args.batch_size) also an option
         model.train()
 
         for step, (seq, labels) in enumerate(train_loader):
             seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1]).double()  #seq has shape [B, TW, Features]
-            labels=labels.reshape(labels.shape[0], labels.shape[-1]).double() #labels has shape  [B, Labels], so [B, timesteps]  # labels.shape[1]  , maybe should add features  labels = labels.reshape(labels.shape[0], labels.shape[1],labels.shape[-1])  #, labels.shape[-1]
-            #labels = labels[:, ]
-            # zero the gradients  # Step 1. Remember that Pytorch accumulates gradients # We need to clear gradients before each instance
+            labels=labels.reshape(labels.shape[0], labels.shape[-1]).double() #labels has shape  [B, fut-pred steps, features]
+
+            # zero the gradients  #Pytorch accumulates gradients, we need to clear gradients before each instance
             optimizer.zero_grad()
 
             # forward pass through the model
-            #if the model initialises the hidden state at each batch, we should not input the previous hidden state
             if init_batch==1:
+                # if the model initialises the hidden state at each batch, we should not input the previous hidden state
                 y_pred, model.hidden_cell = model.forward(seq)
 
             else:
                 # Starting each batch, we detach the hidden state from how it was previously produced.
-                # Tthis means that we dont propagate back till the beginning of the input data,
-                # but consider the input hidden cell from the last batch as constant
-                # Otherwise the model would  backpropagate all the way to start of the dataset.
-                #y_pred, model.hidden_cell = model.forward(seq, (model.hidden_cell[0].detach().float64(), model.hidden_cell[1].detach().float64()), print_hidden=False, stateful_batches=stateful)  #states=None if i put in states=None, it doesnt think it is none anymore  #underscore is for hidden and cell state which we ignore during training.
-                y_pred, model.hidden_cell = model.forward(seq, (model.hidden_cell[0].detach(), model.hidden_cell[1].detach()), print_hidden=False, stateful_batches=stateful)  #states=None if i put in states=None, it doesnt think it is none anymore  #underscore is for hidden and cell state which we ignore during training.
+                # This means that we consider the input hidden cell from the last batch as constant
+                # and we dont propagate back till the beginning of the input data.
+                y_pred, model.hidden_cell = model.forward(seq, (model.hidden_cell[0].detach(), model.hidden_cell[1].detach()), print_hidden=False, stateful_batches=stateful)
 
             #compute loss
             single_loss =  utils.loss_function(y_pred, labels)
@@ -96,16 +83,17 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
             epoch_train_loss+=loss_current
 
         for val_batch_no, (seq, labels) in enumerate(val_loader):
-            seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1]).double()
-            labels = labels.reshape(labels.shape[0], labels.shape[-1]).double()  # labels has shape  [B, Labels], so [B, timesteps]  # labels.shape[1]  , maybe should add features  labels = labels.reshape(labels.shape[0], labels.shape[1],labels.shape[-1])  #, labels.shape[-1]
-            #labels = labels[:, 0:1]
+            seq=seq.reshape(seq.shape[0], seq.shape[1], seq.shape[-1]).double()  #seq has shape [B, TW, Features]
+            labels = labels.reshape(labels.shape[0], labels.shape[-1]).double()  #labels has shape  [B, fut-pred steps, features]
+
             # we dont have to input the detached hiddens state, cause there is no backprop
             with torch.no_grad():
                 # forward pass through the model
+                # underscore is for hidden and cell state which we ignore during training.
                 if init_batch==1:
                     y_pred, _ = model.forward(seq)
                 else:
-                    y_pred, _ = model.forward(seq, stateful_batches=stateful)  # underscore is for hidden and cell state which we ignore during training.
+                    y_pred, _ = model.forward(seq, stateful_batches=stateful)
 
                 #labels = labels.squeeze(1) #or change model output to correct shape
                 single_loss = utils.loss_function(y_pred, labels).item()
@@ -133,10 +121,5 @@ def train(train_inout_seq, val_inout_seq, train_window, epochs, batch_size, inpu
     model_path= results_folder + 'LSTM_' + 'tw_' + str(train_window) + '.pt'
     torch.save(model.state_dict(), model_path)
     print('Model saved in ' + model_path)
-
-    # #save model in guild run
-    # model_path2= os.path.abspath(os.getcwd())  + '/my-saved-model.pt'
-    # torch.save(model.state_dict(), model_path2)
-    # print('Model saved in ' + model_path2)
 
     return model

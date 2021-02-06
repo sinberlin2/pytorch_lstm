@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-#https://stackabuse.com/time-series-prediction-using-lstm-with-pytorch-in-python/
 
 #LSTM network river levels one station
 import numpy as np # linear algebra
@@ -12,12 +11,11 @@ import test_pytorch_lstm
 from data_loader_river_data import DataLoader
 import pytorch_model_cond
 import pytorch_model_init_ev_batch
-#import pytorch_model_cond
 
 #Define default model parameters
 model_type= 'LSTM'
 stateful=0
-init_batch=0
+init_batch=1
 hidden_layer_size=30  #30 stage
 num_layers= 2
 output_size= 1 #keep this 1, is the prediction size (1 day at a time is predicted)
@@ -25,8 +23,8 @@ epochs = 1
 loss_metric = 'RMSE'
 lr=0.002  #for stage prediction, 0.0002 was too low
 lr_decay=0.0
-fut_pred=1 # how many predictions are made into the future
-batch_size=10
+fut_pred=2 # how many predictions are made into the future
+batch_size=12
 sliding_window=10
 dropout=0.5 #droupout probability , NOT keep probability # we need dropout 0.5
 load_model = False
@@ -77,7 +75,7 @@ results_folder=base_path +results_folder
 
 
 def main():
-    print('cond lastm ')
+    print('cond lstm predicting ' + pred_var)
     data_loader= DataLoader(pred_var, sliding_window, output_size, input_size, base_path, data_folder, sub_folder, cond_vars_dict)
     dataset=data_loader.load_data()
     train_inout_seq, val_inout_seq, test_inout_seq  = data_loader.split_scale_transform(dataset)
@@ -110,21 +108,16 @@ def main():
     test_preds = data_loader.scale_back(yhat)
     test_y = data_loader.scale_back(test_y)
 
-    # print(test_preds[:10,0, :])
-    # print(test_y[:10,0,:])
-    #
-
     #plot all predictions of first index
-    utils.plot_test_predictions(dataset, test_y, sliding_window, results_folder, u2_values[0], test_preds, pred_var, fut_pred, pred_index=0, show_last=False)
-    # #plot last 50 predictions of first and last index
-    utils.plot_test_predictions(dataset, test_y, sliding_window, results_folder, u2_values[0], test_preds, pred_var, fut_pred, pred_index=0, show_last=100)
-
-    # utils.plot_test_predictions(dataset, sliding_window, results_folder, u2_values[0], test_preds, pred_var, fut_pred, pred_index= 0, show_last=100)
-    # utils.plot_test_predictions(dataset, sliding_window, results_folder, u2_values[0], test_preds, pred_var, fut_pred, pred_index= -1, show_last=20)
+    utils.plot_test_predictions(test_y, sliding_window, results_folder, u2_values, test_preds, pred_var, pred_index=0, show_last=False)
+    # #plot last X predictions of first and last index
+    utils.plot_test_predictions(test_y, sliding_window, results_folder, u2_values, test_preds, pred_var, pred_index=0, show_last=100)
+    utils.plot_test_predictions(test_y, sliding_window, results_folder, u2_values, test_preds, pred_var, pred_index= -1, show_last=20)
 
     #for some random test data, plot all of its predictions
-    for pred_no in [0, 30, 50,144 ]:  # last number has to be < len(lest_inout_seq)-fut_pred
-        utils.plot_sample_prediction(test_x, test_y[:,0,0], test_preds[:,:,0], pred_no, sliding_window, fut_pred, output_size, results_folder, pred_var)
+    for pred_no in [0, 30, 50, 144]:
+        assert pred_no <= test_y.shape[0] - fut_pred, "make sure that prediction is within valid range"
+        utils.plot_sample_prediction(test_x, test_y, test_preds, pred_no, sliding_window, fut_pred, output_size, results_folder, pred_var)
 
 
 if __name__ == '__main__':

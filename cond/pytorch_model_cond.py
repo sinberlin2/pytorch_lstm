@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.autograd import Variable
 
 
 class LSTM(nn.Module):
@@ -23,6 +24,11 @@ class LSTM(nn.Module):
         #define hidden cell, not necessary
         self.hidden_cell=None
 
+    def init_hidden(self, batch_size):
+        #hidden and cell state have shape (num_layers * num_directions, batch_size, hidden_layer_size)
+        hidden_cell = (Variable(torch.zeros((self.num_layers, batch_size, self.hidden_layer_size), dtype=torch.double)),
+            Variable(torch.zeros((self.num_layers, batch_size, self.hidden_layer_size), dtype=torch.double)))
+        return hidden_cell
 
     def forward(self, input, states=None, print_hidden=False, stateful_batches=False):
 
