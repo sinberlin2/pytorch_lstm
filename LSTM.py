@@ -9,8 +9,6 @@ import utils
 import train_pytorch_lstm
 import test_pytorch_lstm
 from data_loader_river_data import DataLoader
-import pytorch_model_cond
-import pytorch_model_init_ev_batch
 import pytorch_lstm_model
 
 #Define default model parameters
