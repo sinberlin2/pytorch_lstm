@@ -18,6 +18,7 @@ def plot_loss(epochs, results_folder, train_losses, val_losses):
     plt.xticks(x_grid)
     plt.plot(train_losses, label='train')
     plt.plot(val_losses, label='val')
+    plt.legend()
     fig_path =  results_folder  + '_loss'
     plt.savefig(fig_path)
     # plt.show()
@@ -50,8 +51,6 @@ def get_u2_value(y_pred, y_true, y_prev):  #x is y_pred
     return u2_value
 
 
-
-#could add option to only plot the last values
 def plot_test_predictions( test_y, tw, results_folder, u2_value,  test_preds, pred_var, pred_index=0, show_last= 50):
 
     #get the relevant test data (first prediction day etc). By default this is the first prediction day
@@ -76,7 +75,7 @@ def plot_test_predictions( test_y, tw, results_folder, u2_value,  test_preds, pr
     plt.plot(x, test_preds_sel, label='predictions')
 
     #create plot
-    plt.suptitle('LSTM Predictions of ' +pred_var + ' for day ' + str(pred_index), fontsize=12)
+    plt.suptitle('LSTM Predictions of ' +pred_var + ' for a ' + str(pred_index + 1) + 'day prediction', fontsize=12)
     plt.title('u2 value: '+ str(u2_value[0][pred_index]) , fontsize=10)
     plt.ylabel(pred_var)
     plt.xlabel('Days')

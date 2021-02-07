@@ -13,16 +13,16 @@ import pytorch_lstm_model
 
 #Define default model parameters
 model_type= 'LSTM'
-stateful_batches=1
+stateful_batches=0
 stateful=1
 hidden_layer_size=30  #30 stage
 num_layers= 2
 output_size= 1 #keep this 1, is the prediction size (1 day at a time is predicted)
-epochs = 1
+epochs = 20
 loss_metric = 'RMSE'
 lr=0.002  #for stage prediction, 0.0002 was too low
 lr_decay=0.0
-fut_pred=2 # how many predictions are made into the future
+fut_pred=10 # how many predictions are made into the future
 batch_size=12
 sliding_window=10
 dropout=0.5 #droupout probability , NOT keep probability # we need dropout 0.5
@@ -43,6 +43,9 @@ all_vars = ['stage', 'flow', 'rain']
 stage = False
 flow = False
 rain = True
+#specify which variables need to be scaled
+scaler_vars = ['stage', 'flow', 'rain']
+
 #add selected variables to dictionary
 cond_vars_dict = dict(((k, eval(k)) for k in all_vars))
 
@@ -75,7 +78,7 @@ results_folder=base_path +results_folder
 
 def main():
     print('cond lstm predicting ' + pred_var)
-    data_loader= DataLoader(pred_var, sliding_window, output_size, input_size, base_path, data_folder, sub_folder, cond_vars_dict)
+    data_loader= DataLoader(pred_var, sliding_window, output_size, input_size, base_path, data_folder, sub_folder, cond_vars_dict, scaler_vars)
     dataset=data_loader.load_data()
     train_inout_seq, val_inout_seq, test_inout_seq  = data_loader.split_scale_transform(dataset)
 

@@ -35,7 +35,7 @@ def combine_data(main_df, cond_df):
 
 
 class DataLoader(object):
-    def __init__(self, pred_var, sliding_window, output_size, input_size, base_path, data_folder, sub_folder, cond_vars):
+    def __init__(self, pred_var, sliding_window, output_size, input_size, base_path, data_folder, sub_folder, cond_vars, scaler_vars):
         """
         :param xs:
         :param ys:
@@ -63,7 +63,6 @@ class DataLoader(object):
 
         #Specify which variables should have a scaler (apart from prediction variable which has a scaler)
         self.scaler=MinMaxScaler(feature_range=(0, 1))
-        scaler_vars=['stage' , 'flow', 'rain']
         self.scaler_stage = MinMaxScaler(feature_range=(0, 1))
         self.scaler_flow = MinMaxScaler(feature_range=(0, 1))
         self.scaler_rain = MinMaxScaler(feature_range=(0, 1))
